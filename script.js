@@ -89,6 +89,11 @@ const metadata = [
     type: "number",
     label: "Total (Quantity * Unit price)",
   },
+  {
+    id: "genre",
+    type: "string",
+    label: "Genre",
+  },
 ];
 
 const additionalDataFromBooksDB = [
@@ -208,12 +213,18 @@ let book = data.map((book) => {
   return {
     title: book.title,
     author: book.author,
+    genre: book.genre,
   };
 });
 
 class Grid {
   constructor() {
-    this.data = data;
+    this.data = data.map((item) => {
+      const additionalData = additionalDataFromBooksDB.find(
+        (data) => data.title === item.title && data.author === item.author
+      );
+      return { ...item, genre: additionalData ? additionalData.genre : "" };
+    });
     this.metadata = metadata;
 
     // HINT: below map can be useful for view operations ;))
@@ -358,10 +369,10 @@ class Grid {
     );
 
     if (visibleColumns.length > 0) {
-      const columnToHide = visibleColumns[0];
-      const columnIndex = columnToHide.cellIndex;
+      const columnHideElement = visibleColumns[0];
+      const columnIndex = columnHideElement.cellIndex;
 
-      columnToHide.classList.add("hide");
+      columnHideElement.classList.add("hide");
 
       for (const row of this.body.rows) {
         row.cells[columnIndex].classList.add("hide");
@@ -424,28 +435,16 @@ class Grid {
     const markedCells = Array.from(this.body.rows).filter((row) => {
       return Array.from(row.cells).some((cell) => cell.innerHTML.trim() === "");
     });
+
     markedCells.forEach((cell) => {
       const columnIndex = cell.cellIndex;
       const columnId = this.metadata[columnIndex].id;
 
+      const dependencyValues = this.getDependencyValues(columnId, cell);
       const newValue = this.calculateValue(columnId, dependencyValues);
       cell.innerText = newValue;
       cell.classList.remove("mark");
     });
-  }
-
-  getDependencies(columnId) {
-    const dependencies = [];
-
-    if (columnId === "total_value") {
-      dependencies.push("quantity", "unit_price");
-    } else if (columnId === "quantity") {
-      dependencies.push("total_value", "unit_price");
-    } else if (columnId === "unit_price") {
-      dependencies.push("total_value", "quantity");
-    }
-
-    return dependencies;
   }
 
   calculateValue(columnId, dependencyValues) {
@@ -459,34 +458,41 @@ class Grid {
       const [totalValue, quantity] = dependencyValues;
       return totalValue / quantity;
     }
-
-    return "";
   }
 
   onCountEmptyClick(event) {
-    console.error(`Counting amount of empty cells...`);
+    const emptyCells = Array.from(this.body.rows).filter((row) => {
+      return Array.from(row.cells).some((cell) => cell.innerText.trim() === "");
+    });
+
+    const emptyCellCount = emptyCells.length;
+
+    alert(`There are ${emptyCellCount} empty cells in the table.`);
   }
 
   onComputeTotalsClick(event) {
-    console.error(`Computing summary totals...`);
+    const totalValueCells = Array.from(this.body.rows).map((row) => {
+      return row.cells[row.cells.length - 2].innerText.trim();
+    });
+
+    const visibleTotalValues = totalValueCells
+      .filter((value) => value !== "")
+      .map(parseFloat);
+
+    const sum = visibleTotalValues.reduce(
+      (accumulator, value) => accumulator + value,
+      0
+    );
+
+    alert(`Total: ${sum}`);
   }
 
   onFunctionsResetClick(event) {
-    while (this.body.firstChild) {
-      this.body.firstChild.remove();
-    }
-
-    for (const dataRow of this.data) {
-      const row = this.body.insertRow();
-
-      for (const column of this.metadata) {
-        const cell = row.insertCell();
-        cell.classList.add(column.type);
-        cell.innerText = dataRow[column.id];
-      }
-
-      this.dataViewRef.set(dataRow, row);
-    }
+    const table = document.querySelector("table");
+    const markedCells = Array.from(table.querySelectorAll(".mark"));
+    markedCells.forEach((cell) => {
+      cell.classList.remove("mark");
+    });
   }
 }
 
